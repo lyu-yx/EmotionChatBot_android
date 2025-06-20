@@ -583,7 +583,7 @@ public class TabConfActivity extends Activity {
     private void autoFillAliyunConfig() {
         // 阿里云官方配置
         String aliyunApiKey = "sk-cca081700e614b30a601d3599f94e5f4";
-        String aliyunBaseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+        String aliyunBaseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1/";
         String defaultModel = "qwen-turbo";
         
         // 检查当前API Key是否为空或不是阿里云格式

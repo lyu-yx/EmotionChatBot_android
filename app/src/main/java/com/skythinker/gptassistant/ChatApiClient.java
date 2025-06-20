@@ -399,7 +399,7 @@ public class ChatApiClient {
         
         if (GlobalDataHolder.getUseAliyunChat()) {
             // 根据阿里云官方文档，使用OpenAI兼容模式的base_url
-            actualUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+            actualUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1/";
             // 在阿里云模式下，优先使用阿里云ASR的API Key，如果没有则使用传入的API Key
             String aliyunApiKey = GlobalDataHolder.getAsrAliyunApiKey();
             if (aliyunApiKey != null && !aliyunApiKey.trim().isEmpty() && aliyunApiKey.startsWith("sk-")) {
@@ -436,8 +436,8 @@ public class ChatApiClient {
                 // 验证阿里云URL格式
                 if (!actualUrl.contains("aliyuncs.com")) {
                     Log.e("ChatApiClient", "阿里云URL格式错误！当前URL: " + actualUrl);
-                    Log.e("ChatApiClient", "正确的URL应该是: https://dashscope.aliyuncs.com/compatible-mode/v1");
-                    throw new IllegalArgumentException("阿里云URL格式错误，正确格式应为: https://dashscope.aliyuncs.com/compatible-mode/v1");
+                    Log.e("ChatApiClient", "正确的URL应该是: https://dashscope.aliyuncs.com/compatible-mode/v1/");
+                    throw new IllegalArgumentException("阿里云URL格式错误，正确格式应为: https://dashscope.aliyuncs.com/compatible-mode/v1/");
                 }
                 
                 // 检查常见的拼写错误

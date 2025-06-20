@@ -104,7 +104,7 @@
     <string name="text_aliyun_asr_unsupported">Aliyun ASR service is temporarily unavailable</string>
     <string name="conf_aliyun_api_key_item">Aliyun API Key</string>
     <string name="conf_use_aliyun_chat_item">Use Aliyun Qwen Models</string>
-    <string name="text_aliyun_chat_url_hint">Base URL should be: https://dashscope.aliyuncs.com/compatible-mode/v1</string>
+    <string name="text_aliyun_chat_url_hint">Base URL should be: https://dashscope.aliyuncs.com/compatible-mode/v1/</string>
     <string name="text_aliyun_config_guide">When using Aliyun, please fill in Aliyun API Key (starts with sk-) in OpenAI settings</string>
     <string name="text_aliyun_auto_config">Aliyun Qwen service configured automatically</string>
     <string name="text_openai_compatible_mode">Using OpenAI compatible mode to call Aliyun service</string>

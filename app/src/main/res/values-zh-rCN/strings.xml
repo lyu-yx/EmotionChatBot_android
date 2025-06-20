@@ -34,7 +34,7 @@
     <string name="text_aliyun_asr_unsupported">阿里云语音识别服务暂时不可用</string>
     <string name="conf_aliyun_api_key_item">阿里云API Key</string>
     <string name="conf_use_aliyun_chat_item">使用阿里云通义千问模型</string>
-    <string name="text_aliyun_chat_url_hint">Base URL应为: https://dashscope.aliyuncs.com/compatible-mode/v1</string>
+    <string name="text_aliyun_chat_url_hint">Base URL应为: https://dashscope.aliyuncs.com/compatible-mode/v1/</string>
     <string name="text_aliyun_config_guide">使用阿里云时，请在OpenAI设置中填入阿里云API Key（以sk-开头）</string>
     <string name="text_aliyun_auto_config">已自动配置阿里云通义千问服务</string>
     <string name="text_openai_compatible_mode">使用OpenAI兼容模式调用阿里云服务</string>
