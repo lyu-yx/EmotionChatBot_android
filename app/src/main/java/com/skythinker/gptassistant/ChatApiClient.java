@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import cn.hutool.json.JSONObject;
 import okhttp3.ConnectionSpec;
@@ -81,9 +82,9 @@ public class ChatApiClient {
         this.model = model;
         this.temperature = GlobalDataHolder.getGptTemperature(); // 从全局设置中获取温度参数
         httpClient = new OkHttpClient.Builder()
-            .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)  // 增加连接超时时间
-            .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)    // 增加读取超时时间，适应流式响应
-            .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)    // 增加写入超时时间
+            .connectTimeout(60, TimeUnit.SECONDS)  // 增加连接超时时间
+            .readTimeout(120, TimeUnit.SECONDS)    // 增加读取超时时间，适应流式响应
+            .writeTimeout(60, TimeUnit.SECONDS)    // 增加写入超时时间
             .connectionSpecs(Arrays.asList(ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))  // 优先使用现代TLS
             .retryOnConnectionFailure(true)  // 启用连接失败重试
             .build();
