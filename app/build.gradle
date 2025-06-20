@@ -64,4 +64,11 @@ dependencies {
     // iText PDF for PDF documents
     implementation 'com.itextpdf:itextpdf:5.5.13.3'
     implementation 'com.itextpdf:itext7-core:7.2.5'
+    
+    // Alibaba DashScope for speech recognition
+    implementation 'com.alibaba:dashscope-sdk-java:2.16.7'
+    
+    // RxJava dependencies (required for Alibaba DashScope)
+    implementation 'io.reactivex.rxjava3:rxjava:3.1.5'
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.21'
 }

@@ -634,6 +634,8 @@ public class MainActivity extends Activity {
             setAsrClient("whisper");
         } else if(GlobalDataHolder.getAsrUseGoogle()) {
             setAsrClient("google");
+        } else if(GlobalDataHolder.getAsrUseAliyun()) {
+            setAsrClient("aliyun");
         } else {
             setAsrClient("hms");
         }
@@ -712,6 +714,9 @@ public class MainActivity extends Activity {
         } else if (type.equals("google")) {
             asrClient = new GoogleAsrClient(this);
             asrClient.setCallback(asrCallback);
+        } else if (type.equals("aliyun")) {
+            asrClient = new AliyunAsrClient(this, GlobalDataHolder.getAsrAliyunApiKey());
+            asrClient.setCallback(asrCallback);
         }
     }
 
@@ -747,13 +752,20 @@ public class MainActivity extends Activity {
                 setAsrClient("whisper");
             } else if(GlobalDataHolder.getAsrUseGoogle() && !(asrClient instanceof GoogleAsrClient)) {
                 setAsrClient("google");
-            } else if(!GlobalDataHolder.getAsrUseBaidu() && !GlobalDataHolder.getAsrUseWhisper() && !GlobalDataHolder.getAsrUseGoogle() && !(asrClient instanceof HmsAsrClient)) {
+            } else if(GlobalDataHolder.getAsrUseAliyun() && !(asrClient instanceof AliyunAsrClient)) {
+                setAsrClient("aliyun");
+            } else if(!GlobalDataHolder.getAsrUseBaidu() && !GlobalDataHolder.getAsrUseWhisper() && !GlobalDataHolder.getAsrUseGoogle() && !GlobalDataHolder.getAsrUseAliyun() && !(asrClient instanceof HmsAsrClient)) {
                 setAsrClient("hms");
             }
 
             // 更新Whisper接口的API信息
             if(asrClient instanceof WhisperAsrClient) {
                 ((WhisperAsrClient) asrClient).setApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey());
+            }
+            
+            // 更新阿里云接口的API信息
+            if(asrClient instanceof AliyunAsrClient) {
+                ((AliyunAsrClient) asrClient).setApiKey(GlobalDataHolder.getAsrAliyunApiKey());
             }
 
             setNetworkEnabled(currentTemplateParams.getBool("network", GlobalDataHolder.getEnableInternetAccess())); // 更新GPT联网设置

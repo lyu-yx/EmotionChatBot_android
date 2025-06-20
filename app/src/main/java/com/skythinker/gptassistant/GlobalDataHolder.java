@@ -20,10 +20,12 @@ public class GlobalDataHolder {
     private static boolean asrUseWhisper;
     private static boolean asrUseGoogle;
     private static boolean asrUseBaidu;
+    private static boolean asrUseAliyun;
     private static String asrAppId;
     private static String asrApiKey;
     private static String asrSecretKey;
     private static boolean asrUseRealTime;
+    private static String asrAliyunApiKey;
     private static String gptApiHost;
     private static String gptApiKey;
     private static String gptModel;
@@ -51,6 +53,7 @@ public class GlobalDataHolder {
         }
         loadAsrSelection();
         loadBaiduAsrInfo();
+        loadAliyunAsrInfo();
         loadGptApiInfo();
         loadModelParams();
         loadStartUpSetting();
@@ -102,16 +105,19 @@ public class GlobalDataHolder {
         asrUseWhisper = sp.getBoolean("asr_use_whisper", false);
         asrUseBaidu = sp.getBoolean("asr_use_baidu", false);
         asrUseGoogle = sp.getBoolean("asr_use_google", false);
+        asrUseAliyun = sp.getBoolean("asr_use_aliyun", false);
     }
 
-    public static void saveAsrSelection(boolean useWhisper, boolean useBaidu, boolean useGoogle) {
+    public static void saveAsrSelection(boolean useWhisper, boolean useBaidu, boolean useGoogle, boolean useAliyun) {
         asrUseWhisper = useWhisper;
         asrUseBaidu = useBaidu;
         asrUseGoogle = useGoogle;
+        asrUseAliyun = useAliyun;
         SharedPreferences.Editor editor = sp.edit();
         editor.putBoolean("asr_use_whisper", asrUseWhisper);
         editor.putBoolean("asr_use_baidu", asrUseBaidu);
         editor.putBoolean("asr_use_google", asrUseGoogle);
+        editor.putBoolean("asr_use_aliyun", asrUseAliyun);
         editor.apply();
     }
 
@@ -132,6 +138,17 @@ public class GlobalDataHolder {
         editor.putString("asr_api_key", asrApiKey);
         editor.putString("asr_secret_key", asrSecretKey);
         editor.putBoolean("asr_use_real_time", asrUseRealTime);
+        editor.apply();
+    }
+
+    public static void loadAliyunAsrInfo() {
+        asrAliyunApiKey = sp.getString("asr_aliyun_api_key", "sk-cca081700e614b30a601d3599f94e5f4");
+    }
+
+    public static void saveAliyunAsrInfo(String apiKey) {
+        asrAliyunApiKey = apiKey;
+        SharedPreferences.Editor editor = sp.edit();
+        editor.putString("asr_aliyun_api_key", asrAliyunApiKey);
         editor.apply();
     }
 
@@ -278,6 +295,8 @@ public class GlobalDataHolder {
 
     public static boolean getAsrUseBaidu() { return asrUseBaidu; }
 
+    public static boolean getAsrUseAliyun() { return asrUseAliyun; }
+
     public static String getAsrAppId() { return asrAppId; }
 
     public static String getAsrApiKey() { return asrApiKey; }
@@ -285,6 +304,8 @@ public class GlobalDataHolder {
     public static String getAsrSecretKey() { return asrSecretKey; }
 
     public static boolean getAsrUseRealTime() { return asrUseRealTime; }
+
+    public static String getAsrAliyunApiKey() { return asrAliyunApiKey; }
 
     public static String getGptApiHost() { return gptApiHost; }
 

@@ -218,8 +218,9 @@ public class TabConfActivity extends Activity {
             if(checked) {
                 ((Switch) findViewById(R.id.sw_asr_use_google_conf)).setChecked(false);
                 ((Switch) findViewById(R.id.sw_asr_use_whisper_conf)).setChecked(false);
+                ((Switch) findViewById(R.id.sw_asr_use_aliyun_conf)).setChecked(false);
             }
-            GlobalDataHolder.saveAsrSelection(GlobalDataHolder.getAsrUseWhisper(), checked, GlobalDataHolder.getAsrUseGoogle());
+            GlobalDataHolder.saveAsrSelection(GlobalDataHolder.getAsrUseWhisper(), checked, GlobalDataHolder.getAsrUseGoogle(), GlobalDataHolder.getAsrUseAliyun());
             setBaiduAsrItemHidden(!checked);
         });
 
@@ -254,8 +255,9 @@ public class TabConfActivity extends Activity {
             if(checked) {
                 ((Switch) findViewById(R.id.sw_asr_use_google_conf)).setChecked(false);
                 ((Switch) findViewById(R.id.sw_asr_use_baidu_conf)).setChecked(false);
+                ((Switch) findViewById(R.id.sw_asr_use_aliyun_conf)).setChecked(false);
             }
-            GlobalDataHolder.saveAsrSelection(checked, GlobalDataHolder.getAsrUseBaidu(), GlobalDataHolder.getAsrUseGoogle());
+            GlobalDataHolder.saveAsrSelection(checked, GlobalDataHolder.getAsrUseBaidu(), GlobalDataHolder.getAsrUseGoogle(), GlobalDataHolder.getAsrUseAliyun());
         });
 
         ((Switch) findViewById(R.id.sw_asr_use_google_conf)).setChecked(GlobalDataHolder.getAsrUseGoogle());
@@ -265,6 +267,7 @@ public class TabConfActivity extends Activity {
                     getPackageManager().getPackageInfo("com.google.android.googlequicksearchbox", PackageManager.GET_META_DATA);
                     ((Switch) findViewById(R.id.sw_asr_use_whisper_conf)).setChecked(false);
                     ((Switch) findViewById(R.id.sw_asr_use_baidu_conf)).setChecked(false);
+                    ((Switch) findViewById(R.id.sw_asr_use_aliyun_conf)).setChecked(false);
                 } catch (PackageManager.NameNotFoundException e) { // 未安装 Google 搜索，提示用户安装
                     new ConfirmDialog(this)
                             .setContent(getString(R.string.dialog_download_google))
@@ -279,7 +282,26 @@ public class TabConfActivity extends Activity {
                     return;
                 }
             }
-            GlobalDataHolder.saveAsrSelection(GlobalDataHolder.getAsrUseWhisper(), GlobalDataHolder.getAsrUseBaidu(), checked);
+            GlobalDataHolder.saveAsrSelection(GlobalDataHolder.getAsrUseWhisper(), GlobalDataHolder.getAsrUseBaidu(), checked, GlobalDataHolder.getAsrUseAliyun());
+        });
+
+        ((Switch) findViewById(R.id.sw_asr_use_aliyun_conf)).setChecked(GlobalDataHolder.getAsrUseAliyun());
+        setAliyunAsrItemHidden(!GlobalDataHolder.getAsrUseAliyun());
+        ((Switch) findViewById(R.id.sw_asr_use_aliyun_conf)).setOnCheckedChangeListener((compoundButton, checked) -> {
+            if(checked) {
+                ((Switch) findViewById(R.id.sw_asr_use_whisper_conf)).setChecked(false);
+                ((Switch) findViewById(R.id.sw_asr_use_baidu_conf)).setChecked(false);
+                ((Switch) findViewById(R.id.sw_asr_use_google_conf)).setChecked(false);
+            }
+            GlobalDataHolder.saveAsrSelection(GlobalDataHolder.getAsrUseWhisper(), GlobalDataHolder.getAsrUseBaidu(), GlobalDataHolder.getAsrUseGoogle(), checked);
+            setAliyunAsrItemHidden(!checked);
+        });
+
+        ((EditText) findViewById(R.id.et_asr_aliyun_api_key_conf)).setText(GlobalDataHolder.getAsrAliyunApiKey());
+        ((EditText) findViewById(R.id.et_asr_aliyun_api_key_conf)).addTextChangedListener(new CustomTextWatcher() {
+            public void afterTextChanged(Editable editable) {
+                GlobalDataHolder.saveAliyunAsrInfo(editable.toString().trim());
+            }
         });
 
         ((Switch) findViewById(R.id.sw_check_access_conf)).setChecked(GlobalDataHolder.getCheckAccessOnStart());
@@ -450,6 +472,11 @@ public class TabConfActivity extends Activity {
         ((LinearLayout) findViewById(R.id.et_asr_api_key_conf).getParent()).setVisibility(hidden ? View.GONE : View.VISIBLE);
         ((LinearLayout) findViewById(R.id.et_asr_secret_conf).getParent()).setVisibility(hidden ? View.GONE : View.VISIBLE);
         ((LinearLayout) findViewById(R.id.sw_asr_real_time_conf).getParent()).setVisibility(hidden ? View.GONE : View.VISIBLE);
+    }
+
+    // 设置阿里云语音识别子配置项是否隐藏
+    private void setAliyunAsrItemHidden(boolean hidden) {
+        ((LinearLayout) findViewById(R.id.et_asr_aliyun_api_key_conf).getParent()).setVisibility(hidden ? View.GONE : View.VISIBLE);
     }
 
     // 设置联网子配置项是否隐藏

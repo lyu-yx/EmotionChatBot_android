@@ -28,6 +28,8 @@
     <string name="conf_baidu_realtime_item">启用长语音</string>
     <string name="conf_use_whisper_asr_item">使用Whisper接口</string>
     <string name="conf_use_google_asr_item">使用谷歌接口</string>
+    <string name="conf_use_aliyun_asr_item">使用阿里云接口</string>
+    <string name="conf_aliyun_api_key_item">阿里云API Key</string>
     <string name="conf_network_title">联网设置</string>
     <string name="conf_enable_network_item">启用网络访问</string>
     <string name="conf_enable_network_tip">开启会大幅增加Token用量</string>

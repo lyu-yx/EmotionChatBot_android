@@ -37,6 +37,8 @@
     <string name="template_help_raw_url_gitee_zh" translatable="false">https://gitee.com/skythinker/gpt-assistant-android/raw/master/template_help.md</string>
     <!-- HMS语音识别API_KEY 已限制包名和签名 -->
     <string name="hms_api_key" translatable="false">DAEDADuGjMLeSU+tLR7t9Z3XEtc5TH45ztgfk9MyzlFy5ogpHIYiX1wL0fWyL9tS/Y7MzU9QK4vtZUvoo97OT4YcpG9BmxtgtQpWpw==</string>
+    <!-- 阿里云语音识别API_KEY -->
+    <string name="aliyun_api_key" translatable="false">sk-cca081700e614b30a601d3599f94e5f4</string>
     <!--  帮助说明  -->
     <string name="help_msg">
         Brief instructions below, see project homepage for more.\n\n
@@ -66,6 +68,8 @@
     <string name="conf_baidu_realtime_item">Enable Long Speech</string>
     <string name="conf_use_whisper_asr_item">Use Whisper Service</string>
     <string name="conf_use_google_asr_item">Use Google Service</string>
+    <string name="conf_use_aliyun_asr_item">Use Aliyun Service</string>
+    <string name="conf_aliyun_api_key_item">Aliyun API Key</string>
     <string name="conf_network_title">Networking Settings</string>
     <string name="conf_enable_network_item">Enable Web Access</string>
     <string name="conf_enable_network_tip">Significantly increases token usage</string>
