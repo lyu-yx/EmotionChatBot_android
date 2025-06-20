@@ -29,7 +29,9 @@ import java.util.concurrent.TimeUnit;
 
 import cn.hutool.json.JSONObject;
 import okhttp3.ConnectionSpec;
+import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.internal.http2.StreamResetException;
 import okhttp3.sse.EventSource;
@@ -81,13 +83,48 @@ public class ChatApiClient {
         this.listener = listener;
         this.model = model;
         this.temperature = GlobalDataHolder.getGptTemperature(); // 从全局设置中获取温度参数
-        httpClient = new OkHttpClient.Builder()
+        
+        // 为阿里云模式创建特殊的HTTP客户端
+        OkHttpClient.Builder clientBuilder = new OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)  // 增加连接超时时间
             .readTimeout(120, TimeUnit.SECONDS)    // 增加读取超时时间，适应流式响应
             .writeTimeout(60, TimeUnit.SECONDS)    // 增加写入超时时间
             .connectionSpecs(Arrays.asList(ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))  // 优先使用现代TLS
-            .retryOnConnectionFailure(true)  // 启用连接失败重试
-            .build();
+            .retryOnConnectionFailure(true);  // 启用连接失败重试
+            
+        // 如果是阿里云模式，添加特殊的拦截器
+        if (GlobalDataHolder.getUseAliyunChat()) {
+            clientBuilder.addInterceptor(new Interceptor() {
+                @Override
+                public Response intercept(Chain chain) throws IOException {
+                    Request originalRequest = chain.request();
+                    
+                    // 获取原始URL
+                    String originalUrl = originalRequest.url().toString();
+                    Log.d("ChatApiClient", "Original request URL: " + originalUrl);
+                    
+                    // 如果URL需要调整（添加compatible-mode路径）
+                    if (originalUrl.contains("dashscope.aliyuncs.com") && 
+                        !originalUrl.contains("/compatible-mode/v1/")) {
+                        
+                        // 重建URL，确保包含正确的路径
+                        String newUrl = originalUrl.replace("dashscope.aliyuncs.com/", 
+                                                           "dashscope.aliyuncs.com/compatible-mode/v1/");
+                        
+                        Request newRequest = originalRequest.newBuilder()
+                            .url(newUrl)
+                            .build();
+                            
+                        Log.d("ChatApiClient", "Adjusted request URL for Aliyun: " + newUrl);
+                        return chain.proceed(newRequest);
+                    }
+                    
+                    return chain.proceed(originalRequest);
+                }
+            });
+        }
+        
+        httpClient = clientBuilder.build();
         setApiInfo(url, apiKey);
     }
 
@@ -430,44 +467,59 @@ public class ChatApiClient {
                 actualApiKey = aliyunApiKey;
                 Log.d("ChatApiClient", "Using Aliyun ASR API Key for chat: " + (actualApiKey.length() > 10 ? actualApiKey.substring(0, 10) + "..." : actualApiKey));
             } else {
-                // 如果阿里云ASR API Key不可用，则使用传入的API Key（应该也是阿里云格式）
                 actualApiKey = apiKey;
-                Log.d("ChatApiClient", "Using provided API Key for Aliyun chat: " + (actualApiKey != null && actualApiKey.length() > 10 ? actualApiKey.substring(0, 10) + "..." : "null"));
+                Log.d("ChatApiClient", "Using provided API Key for Aliyun chat: " + (actualApiKey.length() > 10 ? actualApiKey.substring(0, 10) + "..." : actualApiKey));
             }
-            Log.d("ChatApiClient", "Using Aliyun DashScope API: " + actualUrl);
+            
+            // 验证阿里云配置
+            if (actualApiKey == null || actualApiKey.trim().isEmpty()) {
+                Log.e("ChatApiClient", "阿里云API Key为空！");
+                throw new IllegalArgumentException("阿里云模式下API Key不能为空");
+            }
+            
+            if (!actualApiKey.startsWith("sk-")) {
+                Log.e("ChatApiClient", "阿里云API Key格式错误！应该以'sk-'开头");
+                throw new IllegalArgumentException("阿里云API Key格式错误，应该以'sk-'开头");
+            }
+            
+            // 验证URL格式
+            if (!actualUrl.contains("aliyuncs.com")) {
+                Log.e("ChatApiClient", "阿里云URL格式错误！当前URL: " + actualUrl);
+                Log.e("ChatApiClient", "正确的URL应该是: https://dashscope.aliyuncs.com/compatible-mode/v1/");
+                throw new IllegalArgumentException("阿里云URL格式错误，正确格式应为: https://dashscope.aliyuncs.com/compatible-mode/v1/");
+            }
+            
+            // 检查常见的URL拼写错误
+            if (actualUrl.contains("aiyuncs.com")) {
+                Log.e("ChatApiClient", "URL拼写错误：发现 'aiyuncs.com'");
+                throw new IllegalArgumentException("URL拼写错误：应该是 'aliyuncs.com' 而不是 'aiyuncs.com'");
+            }
+            
+            Log.d("ChatApiClient", "阿里云配置验证通过 - URL: " + actualUrl + ", API Key格式正确");
         }
         
-        if(this.url.equals(actualUrl) && this.apiKey.equals(actualApiKey)) {
-            return;
-        }
         this.url = actualUrl;
         this.apiKey = actualApiKey;
         
         try {
-            // 验证API Key格式
-            if (actualApiKey == null || actualApiKey.trim().isEmpty()) {
-                throw new IllegalArgumentException("API Key不能为空");
-            }
+            Log.d("ChatApiClient", "=== SETTING API INFO ===");
+            Log.d("ChatApiClient", "URL: " + actualUrl);
+            Log.d("ChatApiClient", "API Key: " + (actualApiKey != null && actualApiKey.length() > 10 ? actualApiKey.substring(0, 10) + "..." : actualApiKey));
+            Log.d("ChatApiClient", "Is Aliyun mode: " + GlobalDataHolder.getUseAliyunChat());
             
             if (GlobalDataHolder.getUseAliyunChat()) {
-                // 阿里云API Key通常以sk-开头
-                if (!actualApiKey.startsWith("sk-")) {
-                    Log.e("ChatApiClient", "阿里云API Key格式错误！当前API Key: " + (actualApiKey != null && actualApiKey.length() > 10 ? actualApiKey.substring(0, 10) + "..." : actualApiKey));
-                    Log.e("ChatApiClient", "阿里云API Key应该以'sk-'开头，例如: sk-xxxxxxxxxx");
-                    throw new IllegalArgumentException("阿里云API Key格式错误，应以'sk-'开头。请在设置中填入正确的阿里云API Key！");
-                }
+                Log.d("ChatApiClient", "=== ALIYUN CONFIG CHECK ===");
+                Log.d("ChatApiClient", "Expected URL: https://dashscope.aliyuncs.com/compatible-mode/v1/");
+                Log.d("ChatApiClient", "Actual URL: " + url);
+                Log.d("ChatApiClient", "URL Match: " + url.equals("https://dashscope.aliyuncs.com/compatible-mode/v1/"));
+                Log.d("ChatApiClient", "API Key Format: " + (apiKey != null && apiKey.startsWith("sk-") ? "✓ Correct (sk-...)" : "✗ Wrong format"));
+                Log.d("ChatApiClient", "Model: " + model);
                 
-                // 验证阿里云URL格式
+                // 阿里云模式下的特殊处理
                 if (!actualUrl.contains("aliyuncs.com")) {
                     Log.e("ChatApiClient", "阿里云URL格式错误！当前URL: " + actualUrl);
                     Log.e("ChatApiClient", "正确的URL应该是: https://dashscope.aliyuncs.com/compatible-mode/v1/");
                     throw new IllegalArgumentException("阿里云URL格式错误，正确格式应为: https://dashscope.aliyuncs.com/compatible-mode/v1/");
-                }
-                
-                // 检查常见的拼写错误
-                if (actualUrl.contains("aiyuncs.com")) {
-                    Log.e("ChatApiClient", "检测到URL拼写错误：'aiyuncs.com' 应该是 'aliyuncs.com'");
-                    throw new IllegalArgumentException("URL拼写错误：应该是 'aliyuncs.com' 而不是 'aiyuncs.com'");
                 }
                 
                 Log.d("ChatApiClient", "阿里云配置验证通过 - URL: " + actualUrl + ", API Key格式正确");
@@ -475,9 +527,20 @@ public class ChatApiClient {
             
             Log.d("ChatApiClient", "Initializing OpenAI client with URL: " + actualUrl);
             
+            // 特殊处理：对于阿里云，确保URL格式符合第三方库要求
+            String hostUrl = actualUrl;
+            if (GlobalDataHolder.getUseAliyunChat()) {
+                // 第三方库可能需要base host而不是完整的endpoint
+                if (hostUrl.contains("/compatible-mode/v1")) {
+                    // 尝试使用基础域名
+                    hostUrl = "https://dashscope.aliyuncs.com/";
+                    Log.d("ChatApiClient", "Adjusted host URL for third-party library: " + hostUrl);
+                }
+            }
+            
             chatGPT = new OpenAiStreamClient.Builder()
                     .apiKey(Arrays.asList(actualApiKey))
-                    .apiHost(actualUrl)
+                    .apiHost(hostUrl)
                     .okHttpClient(httpClient)
                     .build();
                     
