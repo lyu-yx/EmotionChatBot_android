@@ -69,6 +69,9 @@
     <string name="conf_use_whisper_asr_item">Use Whisper Service</string>
     <string name="conf_use_google_asr_item">Use Google Service</string>
     <string name="conf_use_aliyun_asr_item">Use Aliyun Service</string>
+    <string name="conf_aliyun_asr_api_key_item">Aliyun API Key</string>
+    <string name="text_aliyun_asr_failed_error">Please check Aliyun ASR service settings</string>
+    <string name="text_aliyun_asr_unsupported">Aliyun ASR service is temporarily unavailable</string>
     <string name="conf_aliyun_api_key_item">Aliyun API Key</string>
     <string name="conf_network_title">Networking Settings</string>
     <string name="conf_enable_network_item">Enable Web Access</string>

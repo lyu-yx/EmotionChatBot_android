@@ -29,6 +29,9 @@
     <string name="conf_use_whisper_asr_item">使用Whisper接口</string>
     <string name="conf_use_google_asr_item">使用谷歌接口</string>
     <string name="conf_use_aliyun_asr_item">使用阿里云接口</string>
+    <string name="conf_aliyun_asr_api_key_item">阿里云API密钥</string>
+    <string name="text_aliyun_asr_failed_error">请检查阿里云语音识别服务设置</string>
+    <string name="text_aliyun_asr_unsupported">阿里云语音识别服务暂时不可用</string>
     <string name="conf_aliyun_api_key_item">阿里云API Key</string>
     <string name="conf_network_title">联网设置</string>
     <string name="conf_enable_network_item">启用网络访问</string>

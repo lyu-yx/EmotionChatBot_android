@@ -34,13 +34,21 @@ public class AliyunAsrClient extends AsrClientBase {
     private Disposable recognitionDisposable;
     
     public AliyunAsrClient(Context context, String apiKey) {
+        if (context == null) {
+            throw new IllegalArgumentException("Context cannot be null");
+        }
         this.context = context;
         this.apiKey = apiKey;
-        Log.d(TAG, "AliyunAsrClient initialized with apiKey: " + (apiKey != null ? "***" : "null"));
+        Log.d(TAG, "AliyunAsrClient initialized with apiKey: " + (apiKey != null && !apiKey.isEmpty() ? "***" : "null/empty"));
     }
     
     @Override
     public void startRecognize() {
+        if (callback == null) {
+            Log.e(TAG, "Callback is null, cannot start recognition");
+            return;
+        }
+        
         if (apiKey == null || apiKey.isEmpty()) {
             callback.onError("阿里云API Key未设置");
             return;
@@ -89,13 +97,15 @@ public class AliyunAsrClient extends AsrClientBase {
         // Create speech Recognizer
         Recognition recognizer = new Recognition();
         
-        // Create RecognitionParam
+        // Create RecognitionParam, pass the Flowable<ByteBuffer> to audioFrames parameter
         RecognitionParam param = RecognitionParam.builder()
                 .model("paraformer-realtime-v2")
                 .format("pcm")
                 .sampleRate(16000)
-                .apiKey(apiKey)
-                .parameter("semantic_punctuation_enabled", false)
+                .apiKey(apiKey) // set your apikey
+                .parameter("enable_punctuation_prediction", true)
+                .parameter("enable_inverse_text_normalization", true)
+                .parameter("disfluency", false)
                 .build();
         
         // Stream call interface for streaming audio to recognizer
@@ -103,30 +113,43 @@ public class AliyunAsrClient extends AsrClientBase {
                 .subscribe(
                     result -> {
                         // Subscribe to the output result
-                        if (result.isSentenceEnd()) {
-                            Log.d(TAG, "Final Result: " + result.getSentence().getText());
-                            callback.onResult(result.getSentence().getText());
-                            if (autoStop) {
-                                callback.onAutoStop();
+                        Log.d(TAG, "Recognition result: " + result.toString());
+                        
+                        if (result != null && result.getSentence() != null) {
+                            String text = result.getSentence().getText();
+                            if (text != null && !text.isEmpty()) {
+                                if (result.isSentenceEnd()) {
+                                    Log.d(TAG, "Final Result: " + text);
+                                    if (callback != null) {
+                                        callback.onResult(text);
+                                        if (autoStop) {
+                                            callback.onAutoStop();
+                                        }
+                                    }
+                                } else {
+                                    Log.d(TAG, "Intermediate Result: " + text);
+                                    if (callback != null) {
+                                        callback.onResult(text);
+                                    }
+                                }
                             }
-                        } else {
-                            Log.d(TAG, "Intermediate Result: " + result.getSentence().getText());
-                            callback.onResult(result.getSentence().getText());
                         }
                     },
                     error -> {
                         Log.e(TAG, "Recognition error", error);
-                        callback.onError("识别错误：" + error.getMessage());
+                        if (callback != null) {
+                            callback.onError("阿里云语音识别错误：" + error.getMessage());
+                        }
                     },
                     () -> {
                         Log.d(TAG, "Recognition completed");
-                        if (autoStop) {
+                        if (autoStop && callback != null) {
                             callback.onAutoStop();
                         }
                     }
                 );
         
-        Log.d(TAG, "Recognition started with requestId: " + recognizer.getLastRequestId());
+        Log.d(TAG, "Recognition started successfully");
     }
     
     private Flowable<ByteBuffer> createAudioSource() {
@@ -136,15 +159,24 @@ public class AliyunAsrClient extends AsrClientBase {
                     audioRecord.startRecording();
                     Log.d(TAG, "Audio recording started");
                     
-                    ByteBuffer buffer = ByteBuffer.allocate(1024);
+                    byte[] audioBuffer = new byte[1024];
                     
                     while (!shouldExit[0]) {
-                        int read = audioRecord.read(buffer.array(), 0, buffer.capacity());
-                        if (read > 0) {
-                            buffer.limit(read);
+                        int bytesRead = audioRecord.read(audioBuffer, 0, audioBuffer.length);
+                        if (bytesRead > 0) {
+                            // Create a new ByteBuffer and copy the read data
+                            ByteBuffer buffer = ByteBuffer.allocate(bytesRead);
+                            buffer.put(audioBuffer, 0, bytesRead);
+                            buffer.flip(); // Prepare for reading
                             emitter.onNext(buffer);
-                            buffer = ByteBuffer.allocate(1024);
-                            Thread.sleep(20); // Small delay to control CPU usage
+                            
+                            // Small delay to control streaming rate
+                            Thread.sleep(20);
+                        } else if (bytesRead == AudioRecord.ERROR_INVALID_OPERATION || 
+                                   bytesRead == AudioRecord.ERROR_BAD_VALUE) {
+                            Log.e(TAG, "AudioRecord error: " + bytesRead);
+                            emitter.onError(new RuntimeException("AudioRecord error: " + bytesRead));
+                            break;
                         }
                         
                         synchronized (exitFlag) {
@@ -154,6 +186,10 @@ public class AliyunAsrClient extends AsrClientBase {
                             }
                         }
                     }
+                    
+                    Log.d(TAG, "Audio streaming completed");
+                    emitter.onComplete();
+                    
                 } catch (Exception e) {
                     Log.e(TAG, "Audio source error", e);
                     emitter.onError(e);
@@ -166,18 +202,25 @@ public class AliyunAsrClient extends AsrClientBase {
     @Override
     public void stopRecognize() {
         Log.d(TAG, "Stopping recognition");
+        
+        // Signal to stop the audio recording loop
         synchronized (exitFlag) {
             shouldExit[0] = true;
             exitFlag.notifyAll();
         }
         
+        // Dispose of the recognition stream
         if (recognitionDisposable != null && !recognitionDisposable.isDisposed()) {
             recognitionDisposable.dispose();
+            recognitionDisposable = null;
         }
         
+        // Stop and release audio recording resources
         if (audioRecord != null) {
             try {
-                audioRecord.stop();
+                if (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
+                    audioRecord.stop();
+                }
                 audioRecord.release();
                 audioRecord = null;
                 Log.d(TAG, "Audio recording stopped and released");
@@ -186,8 +229,14 @@ public class AliyunAsrClient extends AsrClientBase {
             }
         }
         
+        // Interrupt and clean up the recording thread
         if (recordingThread != null) {
             recordingThread.interrupt();
+            try {
+                recordingThread.join(1000); // Wait up to 1 second for thread to finish
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Thread join interrupted", e);
+            }
             recordingThread = null;
         }
     }

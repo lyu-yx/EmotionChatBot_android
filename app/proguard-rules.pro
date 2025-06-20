@@ -19,3 +19,14 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep Alibaba DashScope SDK classes
+-keep class com.alibaba.dashscope.** { *; }
+-dontwarn com.alibaba.dashscope.**
+
+# Keep RxJava classes
+-keep class io.reactivex.rxjava2.** { *; }
+-dontwarn io.reactivex.rxjava2.**
+
+# Keep Aliyun ASR related classes
+-keep class com.skythinker.gptassistant.AliyunAsrClient { *; }
