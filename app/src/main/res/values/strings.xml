@@ -12,16 +12,31 @@
         <item>qwen-turbo</item>
         <item>qwen-plus</item>
         <item>qwen-max</item>
-        <item>qwen-max-longcontext</item>
+        <item>qwen-long</item>
         <item>qwen-vl-plus</item>
         <item>qwen-vl-max</item>
-        <item>qwen1.5-72b-chat</item>
-        <item>qwen1.5-14b-chat</item>
-        <item>qwen1.5-7b-chat</item>
+        <item>qwen-audio-turbo</item>
+        <item>qwen-audio-chat</item>
         <item>qwen2.5-72b-instruct</item>
         <item>qwen2.5-32b-instruct</item>
         <item>qwen2.5-14b-instruct</item>
         <item>qwen2.5-7b-instruct</item>
+        <item>qwen2.5-3b-instruct</item>
+        <item>qwen2.5-1.5b-instruct</item>
+        <item>qwen2.5-0.5b-instruct</item>
+        <item>qwen2-72b-instruct</item>
+        <item>qwen2-57b-a14b-instruct</item>
+        <item>qwen2-7b-instruct</item>
+        <item>qwen2-1.5b-instruct</item>
+        <item>qwen2-0.5b-instruct</item>
+        <item>qwen1.5-110b-chat</item>
+        <item>qwen1.5-72b-chat</item>
+        <item>qwen1.5-32b-chat</item>
+        <item>qwen1.5-14b-chat</item>
+        <item>qwen1.5-7b-chat</item>
+        <item>qwen1.5-4b-chat</item>
+        <item>qwen1.5-1.8b-chat</item>
+        <item>qwen1.5-0.5b-chat</item>
     </string-array>
     <!--  在线资源Url  -->
     <string name="homepage_url_github" translatable="false">https://github.com/Skythinker616/gpt-assistant-android</string>
