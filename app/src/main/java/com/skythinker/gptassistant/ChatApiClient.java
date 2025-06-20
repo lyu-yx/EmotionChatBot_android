@@ -527,19 +527,20 @@ public class ChatApiClient {
             
             Log.d("ChatApiClient", "Initializing OpenAI client with URL: " + actualUrl);
             
-            // 特殊处理：对于阿里云，确保URL格式符合第三方库要求
+            // 特殊处理：对于阿里云，第三方库需要基础域名而不是完整的endpoint
             String hostUrl = actualUrl;
             if (GlobalDataHolder.getUseAliyunChat()) {
-                // 第三方库可能需要base host而不是完整的endpoint
+                // 第三方库com.unfbx.chatgpt需要基础域名，它会自动添加正确的路径
                 if (hostUrl.contains("/compatible-mode/v1")) {
-                    // 尝试使用基础域名
+                    // 使用基础域名，让第三方库自动处理路径
                     hostUrl = "https://dashscope.aliyuncs.com/";
-                    Log.d("ChatApiClient", "Adjusted host URL for third-party library: " + hostUrl);
+                    Log.d("ChatApiClient", "Using base host URL for third-party library: " + hostUrl);
+                    Log.d("ChatApiClient", "Third-party library will automatically append the correct path");
                 }
             }
             
-            chatGPT = new OpenAiStreamClient.Builder()
-                    .apiKey(Arrays.asList(actualApiKey))
+            chatGPT = OpenAiStreamClient.builder()
+                    .apiKey(actualApiKey)
                     .apiHost(hostUrl)
                     .okHttpClient(httpClient)
                     .build();

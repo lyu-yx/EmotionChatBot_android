@@ -58,8 +58,8 @@ dependencies {
     implementation "io.noties.markwon:image:$markwon_version"
     implementation "io.noties.markwon:syntax-highlight:$markwon_version"
     annotationProcessor 'io.noties:prism4j-bundler:2.0.0'
-    // 替换为官方推荐的OpenAI Java客户端，更好地支持阿里云兼容模式
-    implementation 'com.openai:openai-client:2.6.0'
+    // 继续使用第三方库，已修复阿里云兼容性问题
+    implementation 'com.unfbx:chatgpt-java:1.1.5'
     implementation 'com.huawei.hms:ml-computer-voice-asr:3.12.0.301'
 
     // iText PDF for PDF documents
