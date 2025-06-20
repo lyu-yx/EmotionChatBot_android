@@ -347,7 +347,8 @@ public class ChatApiClient {
         
         if (GlobalDataHolder.getUseAliyunChat()) {
             actualUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1/";
-            actualApiKey = GlobalDataHolder.getAsrAliyunApiKey(); // 使用阿里云的API Key
+            // 阿里云聊天模型使用OpenAI API Key字段存储的阿里云API Key
+            actualApiKey = apiKey;
         }
         
         if(this.url.equals(actualUrl) && this.apiKey.equals(actualApiKey)) {

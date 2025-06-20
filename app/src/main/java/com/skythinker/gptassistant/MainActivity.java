@@ -1709,6 +1709,12 @@ public class MainActivity extends Activity {
         super.onResume();
         isRunning = true;
         Log.d("main activity", "back to main activity");
+        
+        // 从设置页面返回时更新模型列表
+        updateModelSpinner();
+        
+        // 更新ChatApiClient的配置
+        chatApiClient.setApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey());
     }
 
     @Override
