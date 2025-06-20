@@ -101,31 +101,79 @@ public class ChatApiClient {
                     
                     // 获取原始URL
                     String originalUrl = originalRequest.url().toString();
+                    Log.d("ChatApiClient", "=== ALIYUN REQUEST INTERCEPTOR ===");
                     Log.d("ChatApiClient", "Original request URL: " + originalUrl);
                     
-                    // 如果URL需要调整（添加compatible-mode路径）
-                    if (originalUrl.contains("dashscope.aliyuncs.com") && 
-                        !originalUrl.contains("/compatible-mode/v1/")) {
+                    // 检查并修正阿里云URL
+                    String newUrl = originalUrl;
+                    boolean urlModified = false;
+                    
+                    if (originalUrl.contains("dashscope.aliyuncs.com")) {
+                        // 情况1：URL是基础域名，需要添加compatible-mode路径
+                        if (!originalUrl.contains("/compatible-mode/v1/")) {
+                            if (originalUrl.contains("/v1/")) {
+                                // 替换 /v1/ 为 /compatible-mode/v1/
+                                newUrl = originalUrl.replace("/v1/", "/compatible-mode/v1/");
+                                urlModified = true;
+                                Log.d("ChatApiClient", "Replaced /v1/ with /compatible-mode/v1/");
+                            } else if (originalUrl.endsWith("/")) {
+                                // 在末尾添加 compatible-mode/v1/
+                                newUrl = originalUrl + "compatible-mode/v1/";
+                                urlModified = true;
+                                Log.d("ChatApiClient", "Added compatible-mode/v1/ to base URL");
+                            } else {
+                                // 在域名后添加路径
+                                newUrl = originalUrl.replace("dashscope.aliyuncs.com", 
+                                                           "dashscope.aliyuncs.com/compatible-mode/v1");
+                                urlModified = true;
+                                Log.d("ChatApiClient", "Added compatible-mode/v1 path");
+                            }
+                        }
                         
-                        // 重建URL，确保包含正确的路径
-                        String newUrl = originalUrl.replace("dashscope.aliyuncs.com/", 
+                        // 情况2：确保URL以正确的端点结尾
+                        if (originalUrl.contains("/chat/completions") || 
+                            originalUrl.contains("/completions")) {
+                            // URL已经包含端点，检查是否有compatible-mode
+                            if (!originalUrl.contains("/compatible-mode/v1/")) {
+                                newUrl = originalUrl.replace("dashscope.aliyuncs.com/", 
                                                            "dashscope.aliyuncs.com/compatible-mode/v1/");
-                        
+                                urlModified = true;
+                                Log.d("ChatApiClient", "Fixed endpoint URL path");
+                            }
+                        }
+                    }
+                    
+                    if (urlModified) {
+                        Log.d("ChatApiClient", "Modified URL: " + newUrl);
                         Request newRequest = originalRequest.newBuilder()
                             .url(newUrl)
                             .build();
-                            
-                        Log.d("ChatApiClient", "Adjusted request URL for Aliyun: " + newUrl);
+                        Log.d("ChatApiClient", "Proceeding with modified request");
                         return chain.proceed(newRequest);
+                    } else {
+                        Log.d("ChatApiClient", "URL is correct, proceeding with original request");
+                        return chain.proceed(originalRequest);
                     }
-                    
-                    return chain.proceed(originalRequest);
                 }
             });
         }
         
         httpClient = clientBuilder.build();
         setApiInfo(url, apiKey);
+        
+        // 如果是阿里云模式，自动测试连接
+        if (GlobalDataHolder.getUseAliyunChat()) {
+            Log.d("ChatApiClient", "Aliyun mode detected, testing connection...");
+            // 延迟测试，让构造函数先完成
+            new Thread(() -> {
+                try {
+                    Thread.sleep(1000); // 等待1秒
+                    testAliyunConnection();
+                } catch (InterruptedException e) {
+                    Log.e("ChatApiClient", "Connection test interrupted", e);
+                }
+            }).start();
+        }
     }
 
     // 向GPT发送消息列表
@@ -527,23 +575,58 @@ public class ChatApiClient {
             
             Log.d("ChatApiClient", "Initializing OpenAI client with URL: " + actualUrl);
             
-            // 特殊处理：对于阿里云，第三方库需要基础域名而不是完整的endpoint
+            // 对于阿里云，尝试多种URL配置方式
             String hostUrl = actualUrl;
             if (GlobalDataHolder.getUseAliyunChat()) {
-                // 第三方库com.unfbx.chatgpt需要基础域名，它会自动添加正确的路径
-                if (hostUrl.contains("/compatible-mode/v1")) {
-                    // 使用基础域名，让第三方库自动处理路径
-                    hostUrl = "https://dashscope.aliyuncs.com/";
-                    Log.d("ChatApiClient", "Using base host URL for third-party library: " + hostUrl);
-                    Log.d("ChatApiClient", "Third-party library will automatically append the correct path");
-                }
+                Log.d("ChatApiClient", "=== ALIYUN URL CONFIGURATION ===");
+                
+                // 方案1：尝试使用完整的endpoint URL
+                Log.d("ChatApiClient", "Trying full endpoint URL: " + actualUrl);
+                
+                // 方案2：如果方案1失败，准备基础域名作为备选
+                String baseUrl = "https://dashscope.aliyuncs.com/";
+                Log.d("ChatApiClient", "Backup base URL: " + baseUrl);
+                
+                // 首先尝试使用完整的URL
+                hostUrl = actualUrl;
+                Log.d("ChatApiClient", "Initial attempt with: " + hostUrl);
             }
             
-            chatGPT = OpenAiStreamClient.builder()
-                    .apiKey(actualApiKey)
-                    .apiHost(hostUrl)
-                    .okHttpClient(httpClient)
-                    .build();
+            try {
+                chatGPT = OpenAiStreamClient.builder()
+                        .apiKey(actualApiKey)
+                        .apiHost(hostUrl)
+                        .okHttpClient(httpClient)
+                        .build();
+                        
+                Log.d("ChatApiClient", "✅ OpenAI client created successfully with URL: " + hostUrl);
+                
+            } catch (Exception e) {
+                Log.e("ChatApiClient", "❌ Failed to create client with URL: " + hostUrl, e);
+                
+                // 如果是阿里云模式且初始化失败，尝试使用基础域名
+                if (GlobalDataHolder.getUseAliyunChat()) {
+                    Log.d("ChatApiClient", "Retrying with base domain URL...");
+                    String baseUrl = "https://dashscope.aliyuncs.com/";
+                    
+                    try {
+                        chatGPT = OpenAiStreamClient.builder()
+                                .apiKey(actualApiKey)
+                                .apiHost(baseUrl)
+                                .okHttpClient(httpClient)
+                                .build();
+                                
+                        Log.d("ChatApiClient", "✅ OpenAI client created successfully with base URL: " + baseUrl);
+                        this.url = baseUrl; // 更新URL记录
+                        
+                    } catch (Exception e2) {
+                        Log.e("ChatApiClient", "❌ Failed to create client with base URL: " + baseUrl, e2);
+                        throw e2; // 重新抛出异常
+                    }
+                } else {
+                    throw e; // 非阿里云模式，直接抛出异常
+                }
+            }
                     
             Log.d("ChatApiClient", "OpenAI client initialized successfully");
             
@@ -575,6 +658,12 @@ public class ChatApiClient {
     // 设置温度
     public void setTemperature(float temperature) { this.temperature = temperature; }
     
+    // 手动触发阿里云连接测试（供外部调用）
+    public void manualTestAliyunConnection() {
+        Log.d("ChatApiClient", "Manual Aliyun connection test triggered");
+        testAliyunConnection();
+    }
+    
     // 测试阿里云连接
     public void testAliyunConnection() {
         if (!GlobalDataHolder.getUseAliyunChat()) {
@@ -587,24 +676,34 @@ public class ChatApiClient {
         Log.d("ChatApiClient", "API Key: " + (apiKey != null && apiKey.length() > 10 ? apiKey.substring(0, 10) + "..." : apiKey));
         Log.d("ChatApiClient", "Model: " + model);
         
+        // 验证配置
+        if (chatGPT == null) {
+            Log.e("ChatApiClient", "❌ ChatGPT client is null! Cannot test connection.");
+            return;
+        }
+        
         // 创建一个简单的测试消息
         ArrayList<Message> testMessages = new ArrayList<>();
-        testMessages.add(Message.builder().role(Message.Role.USER).content("测试连接").build());
+        testMessages.add(Message.builder().role(Message.Role.USER).content("Hi").build());
         
         ChatCompletion testCompletion = ChatCompletion.builder()
                 .messages(testMessages)
                 .model(model.replaceAll("\\*$",""))
                 .temperature(0.1f)
-                .maxTokens(10)
+                .maxTokens(5)
+                .stream(true)  // 确保使用流式输出
                 .build();
         
-        Log.d("ChatApiClient", "Sending test request...");
+        Log.d("ChatApiClient", "Sending test request with model: " + model.replaceAll("\\*$",""));
         
         try {
             chatGPT.streamChatCompletion(testCompletion, new EventSourceListener() {
                 @Override
                 public void onOpen(EventSource eventSource, Response response) {
                     Log.d("ChatApiClient", "✅ Test connection successful! Response: " + response.code());
+                    Log.d("ChatApiClient", "Response headers: " + response.headers());
+                    // 立即取消测试请求，我们只需要验证连接
+                    eventSource.cancel();
                 }
                 
                 @Override
@@ -615,18 +714,31 @@ public class ChatApiClient {
                 
                 @Override
                 public void onFailure(EventSource eventSource, Throwable t, Response response) {
+                    Log.e("ChatApiClient", "❌ Test connection failed!");
+                    
                     if (response != null) {
-                        Log.e("ChatApiClient", "❌ Test connection failed: HTTP " + response.code());
+                        Log.e("ChatApiClient", "HTTP Status: " + response.code());
+                        Log.e("ChatApiClient", "Response headers: " + response.headers());
+                        
                         try {
                             if (response.body() != null) {
                                 String errorBody = response.body().string();
-                                Log.e("ChatApiClient", "❌ Test error response: " + errorBody);
+                                Log.e("ChatApiClient", "Error response body: " + errorBody);
+                                
+                                // 解析阿里云特定的错误
+                                String parsedError = parseAliyunError(errorBody, response.code());
+                                Log.e("ChatApiClient", "Parsed error: " + parsedError);
                             }
                         } catch (Exception e) {
-                            Log.e("ChatApiClient", "❌ Failed to read test error response", e);
+                            Log.e("ChatApiClient", "Failed to read error response", e);
                         }
-                    } else {
-                        Log.e("ChatApiClient", "❌ Test connection failed: " + (t != null ? t.getMessage() : "Unknown error"));
+                    }
+                    
+                    if (t != null) {
+                        Log.e("ChatApiClient", "Exception: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                        if (t.getCause() != null) {
+                            Log.e("ChatApiClient", "Caused by: " + t.getCause().getClass().getSimpleName() + ": " + t.getCause().getMessage());
+                        }
                     }
                 }
                 
@@ -637,6 +749,10 @@ public class ChatApiClient {
             });
         } catch (Exception e) {
             Log.e("ChatApiClient", "❌ Failed to start test connection", e);
+            Log.e("ChatApiClient", "Exception details: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            if (e.getCause() != null) {
+                Log.e("ChatApiClient", "Caused by: " + e.getCause().getClass().getSimpleName() + ": " + e.getCause().getMessage());
+            }
         }
         
         Log.d("ChatApiClient", "================================");
