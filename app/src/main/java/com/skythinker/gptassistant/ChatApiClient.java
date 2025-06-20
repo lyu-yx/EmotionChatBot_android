@@ -104,6 +104,30 @@ public class ChatApiClient {
         Log.d("ChatApiClient", "API Key: " + (apiKey != null && apiKey.length() > 10 ? apiKey.substring(0, 10) + "..." : apiKey));
         Log.d("ChatApiClient", "Is Aliyun mode: " + GlobalDataHolder.getUseAliyunChat());
         Log.d("ChatApiClient", "Temperature: " + temperature);
+        
+        // 验证阿里云模式下的配置
+        if (GlobalDataHolder.getUseAliyunChat()) {
+            Log.d("ChatApiClient", "=== ALIYUN CONFIG CHECK ===");
+            Log.d("ChatApiClient", "Expected URL: https://dashscope.aliyuncs.com/compatible-mode/v1/");
+            Log.d("ChatApiClient", "Actual URL: " + url);
+            Log.d("ChatApiClient", "URL Match: " + url.equals("https://dashscope.aliyuncs.com/compatible-mode/v1/"));
+            Log.d("ChatApiClient", "API Key Format: " + (apiKey != null && apiKey.startsWith("sk-") ? "✓ Correct (sk-...)" : "✗ Wrong format"));
+            Log.d("ChatApiClient", "Model: " + model);
+            
+            // 检查模型是否是支持的Qwen模型
+            String[] supportedModels = {"qwen-turbo", "qwen-plus", "qwen-max", "qwen-long", 
+                "qwen-vl-plus", "qwen-vl-max", "qwen-audio-turbo", "qwen-audio-chat",
+                "qwen2.5-72b-instruct", "qwen2.5-32b-instruct", "qwen2.5-14b-instruct", 
+                "qwen2.5-7b-instruct", "qwen2.5-3b-instruct", "qwen2.5-1.5b-instruct", "qwen2.5-0.5b-instruct",
+                "qwen2-72b-instruct", "qwen2-57b-a14b-instruct", "qwen2-7b-instruct", 
+                "qwen2-1.5b-instruct", "qwen2-0.5b-instruct",
+                "qwen1.5-110b-chat", "qwen1.5-72b-chat", "qwen1.5-32b-chat", 
+                "qwen1.5-14b-chat", "qwen1.5-7b-chat", "qwen1.5-4b-chat", "qwen1.5-1.8b-chat", "qwen1.5-0.5b-chat"};
+            boolean isModelSupported = java.util.Arrays.asList(supportedModels).contains(model.replaceAll("\\*$", ""));
+            Log.d("ChatApiClient", "Model Support: " + (isModelSupported ? "✓ Supported" : "⚠ Unknown model"));
+            Log.d("ChatApiClient", "============================");
+        }
+        
         Log.d("ChatApiClient", "=========================");
 
         BaseChatCompletion chatCompletion = null;
@@ -599,99 +623,83 @@ public class ChatApiClient {
     
     // 解析阿里云API错误响应
     private String parseAliyunError(String errorBody, int httpCode) {
-        Log.d("ChatApiClient", "Parsing Aliyun error response: " + errorBody);
+        // 特殊处理404错误
+        if (httpCode == 404) {
+            Log.e("ChatApiClient", "HTTP 404错误 - 端点不存在");
+            Log.e("ChatApiClient", "当前使用的URL: " + url);
+            Log.e("ChatApiClient", "当前使用的模型: " + model);
+            Log.e("ChatApiClient", "当前API Key: " + (apiKey != null && apiKey.length() > 10 ? apiKey.substring(0, 10) + "..." : apiKey));
+            
+            String errorMsg = "HTTP 404错误 - 请求的端点不存在\n\n";
+            errorMsg += "可能的原因：\n";
+            errorMsg += "1. URL格式错误 - 当前URL: " + url + "\n";
+            errorMsg += "2. 模型名称错误 - 当前模型: " + model + "\n";
+            errorMsg += "3. API Key无效或格式错误\n\n";
+            errorMsg += "解决方案：\n";
+            errorMsg += "1. 确保URL为: https://dashscope.aliyuncs.com/compatible-mode/v1/\n";
+            errorMsg += "2. 确认模型名称正确（如：qwen-turbo, qwen-plus, qwen-max）\n";
+            errorMsg += "3. 确认API Key以'sk-'开头且有效\n";
+            errorMsg += "4. 检查网络连接和防火墙设置";
+            
+            return errorMsg;
+        }
         
+        // 处理其他错误
         try {
-            JSONObject errorJson = new JSONObject(errorBody);
-            
-            // 阿里云API错误格式1: OpenAI兼容格式 {"error": {"message": "...", "type": "...", "code": "..."}}
-            if (errorJson.containsKey("error")) {
-                JSONObject error = errorJson.getJSONObject("error");
-                String message = error.getStr("message", "");
-                String code = error.getStr("code", "");
-                String type = error.getStr("type", "");
-                
-                StringBuilder errorMsg = new StringBuilder();
-                errorMsg.append("阿里云API错误\n");
-                if (!code.isEmpty()) {
-                    errorMsg.append("错误代码: ").append(code).append("\n");
-                }
-                if (!type.isEmpty()) {
-                    errorMsg.append("错误类型: ").append(type).append("\n");
-                }
-                if (!message.isEmpty()) {
-                    errorMsg.append("错误信息: ").append(message);
-                } else {
-                    errorMsg.append("未知错误");
-                }
-                
-                // 针对常见错误提供解决建议
-                if (code.equals("invalid_api_key") || code.equals("InvalidApiKey") || message.contains("API key") || message.contains("api_key")) {
-                    errorMsg.append("\n\n💡 解决方案: 请检查阿里云API Key是否正确，确保以'sk-'开头");
-                } else if (code.equals("insufficient_quota") || code.equals("InsufficientBalance") || message.contains("balance") || message.contains("quota")) {
-                    errorMsg.append("\n\n💡 解决方案: 账户余额不足，请前往阿里云控制台充值");
-                } else if (code.equals("rate_limit_exceeded") || code.equals("RateLimitExceeded") || message.contains("rate limit")) {
-                    errorMsg.append("\n\n💡 解决方案: 请求频率过高，请稍后重试");
-                } else if (code.equals("model_not_found") || code.equals("ModelNotFound") || message.contains("model")) {
-                    errorMsg.append("\n\n💡 解决方案: 请检查模型名称是否正确，当前支持的模型: qwen-turbo, qwen-plus, qwen-max等");
-                } else if (message.contains("unauthorized") || message.contains("authentication")) {
-                    errorMsg.append("\n\n💡 解决方案: 认证失败，请检查API Key是否有效");
-                }
-                
-                return errorMsg.toString();
+            if (errorBody == null || errorBody.trim().isEmpty()) {
+                return "HTTP " + httpCode + " 错误，无详细信息";
             }
-            
-            // 阿里云API错误格式2: DashScope原生格式 {"code": "...", "message": "...", "request_id": "..."}
-            if (errorJson.containsKey("code") && errorJson.containsKey("message")) {
-                String code = errorJson.getStr("code", "");
-                String message = errorJson.getStr("message", "");
-                String requestId = errorJson.getStr("request_id", "");
-                
-                StringBuilder errorMsg = new StringBuilder();
-                errorMsg.append("阿里云DashScope错误\n");
-                errorMsg.append("错误代码: ").append(code).append("\n");
-                errorMsg.append("错误信息: ").append(message);
-                if (!requestId.isEmpty()) {
-                    errorMsg.append("\n请求ID: ").append(requestId);
+
+            // 尝试解析不同格式的错误响应
+            try {
+                // OpenAI兼容格式
+                JSONObject errorJson = new JSONObject(errorBody);
+                if (errorJson.containsKey("error")) {
+                    JSONObject error = errorJson.getJSONObject("error");
+                    String message = error.getStr("message", "未知错误");
+                    String type = error.getStr("type", "");
+                    String code = error.getStr("code", "");
+                    
+                    String result = "阿里云API错误: " + message;
+                    if (!type.isEmpty()) result += "\n类型: " + type;
+                    if (!code.isEmpty()) result += "\n错误代码: " + code;
+                    
+                    // 添加常见错误的解决建议
+                    if (message.contains("Invalid API key") || message.contains("api key")) {
+                        result += "\n\n解决方案: 请检查API Key是否正确，确保以'sk-'开头";
+                    } else if (message.contains("model") && message.contains("not found")) {
+                        result += "\n\n解决方案: 请检查模型名称是否正确，推荐使用: qwen-turbo, qwen-plus, qwen-max";
+                    } else if (message.contains("quota") || message.contains("balance")) {
+                        result += "\n\n解决方案: API配额不足，请检查账户余额或联系阿里云客服";
+                    }
+                    
+                    return result;
                 }
-                
-                return errorMsg.toString();
+            } catch (Exception e) {
+                // 如果不是标准JSON格式，尝试其他格式
             }
-            
-            // 阿里云API错误格式3: 简单消息格式
-            if (errorJson.containsKey("message")) {
-                return "阿里云API错误: " + errorJson.getStr("message");
+
+            // 尝试DashScope原生格式
+            try {
+                JSONObject errorJson = new JSONObject(errorBody);
+                if (errorJson.containsKey("message")) {
+                    String message = errorJson.getStr("message");
+                    String requestId = errorJson.getStr("request_id", "");
+                    
+                    String result = "阿里云DashScope错误: " + message;
+                    if (!requestId.isEmpty()) result += "\n请求ID: " + requestId;
+                    return result;
+                }
+            } catch (Exception e) {
+                // 如果也不是DashScope格式，使用原始响应
             }
-            
-            if (errorJson.containsKey("detail")) {
-                return "阿里云API错误: " + errorJson.getStr("detail");
-            }
+
+            // 如果都不是标准格式，返回原始错误信息
+            return "HTTP " + httpCode + " 错误\n原始响应: " + errorBody;
             
         } catch (Exception e) {
-            Log.w("ChatApiClient", "Failed to parse error response as JSON: " + e.getMessage());
+            Log.e("ChatApiClient", "解析错误响应失败", e);
+            return "HTTP " + httpCode + " 错误，解析响应失败: " + e.getMessage();
         }
-        
-        // 如果无法解析JSON，返回原始错误信息和HTTP状态码
-        StringBuilder fallbackMsg = new StringBuilder();
-        fallbackMsg.append("HTTP ").append(httpCode).append(" 错误\n");
-        
-        if (httpCode == 400) {
-            fallbackMsg.append("💡 可能原因: 请求参数错误，请检查模型名称和API Key格式");
-        } else if (httpCode == 401) {
-            fallbackMsg.append("💡 可能原因: API Key无效或已过期，请检查阿里云API Key");
-        } else if (httpCode == 403) {
-            fallbackMsg.append("💡 可能原因: 没有访问权限或余额不足，请检查账户状态");
-        } else if (httpCode == 404) {
-            fallbackMsg.append("💡 可能原因: 请求的模型或端点不存在，请检查URL和模型名称");
-        } else if (httpCode == 429) {
-            fallbackMsg.append("💡 可能原因: 请求频率过高，请稍后重试");
-        } else if (httpCode == 500) {
-            fallbackMsg.append("💡 可能原因: 阿里云服务器内部错误，请稍后重试");
-        } else if (httpCode == 502 || httpCode == 503 || httpCode == 504) {
-            fallbackMsg.append("💡 可能原因: 阿里云服务暂时不可用，请稍后重试");
-        }
-        
-        fallbackMsg.append("\n\n原始响应: ").append(errorBody);
-        return fallbackMsg.toString();
     }
 }

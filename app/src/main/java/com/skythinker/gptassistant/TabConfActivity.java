@@ -627,6 +627,7 @@ public class TabConfActivity extends Activity {
         // 显示提示信息
         GlobalUtils.showToast(this, "已自动配置阿里云通义千问服务\n" +
                 "Base URL: " + aliyunBaseUrl + "\n" +
-                "API Key: " + aliyunApiKey.substring(0, 10) + "...", false);
+                "API Key: " + aliyunApiKey.substring(0, 10) + "...\n" +
+                "模型: " + defaultModel, false);
     }
 }
