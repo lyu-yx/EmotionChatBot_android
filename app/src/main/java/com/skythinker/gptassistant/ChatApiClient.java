@@ -79,6 +79,7 @@ public class ChatApiClient {
         this.context = context;
         this.listener = listener;
         this.model = model;
+        this.temperature = GlobalDataHolder.getGptTemperature(); // 从全局设置中获取温度参数
         httpClient = new OkHttpClient.Builder()
             .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)  // 增加连接超时时间
             .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)    // 增加读取超时时间，适应流式响应
@@ -96,10 +97,13 @@ public class ChatApiClient {
             return;
         }
         
+        Log.d("ChatApiClient", "=== REQUEST DEBUG INFO ===");
         Log.d("ChatApiClient", "Sending request to: " + url);
         Log.d("ChatApiClient", "Using model: " + model);
-        Log.d("ChatApiClient", "API Key length: " + (apiKey != null ? apiKey.length() : 0));
+        Log.d("ChatApiClient", "API Key: " + (apiKey != null && apiKey.length() > 10 ? apiKey.substring(0, 10) + "..." : apiKey));
         Log.d("ChatApiClient", "Is Aliyun mode: " + GlobalDataHolder.getUseAliyunChat());
+        Log.d("ChatApiClient", "Temperature: " + temperature);
+        Log.d("ChatApiClient", "=========================");
 
         BaseChatCompletion chatCompletion = null;
 
@@ -264,7 +268,11 @@ public class ChatApiClient {
         chatGPT.streamChatCompletion(chatCompletion, new EventSourceListener() { // GPT返回消息回调
             @Override
             public void onOpen(EventSource eventSource, Response response) {
-                Log.d("ChatApiClient", "onOpen");
+                Log.d("ChatApiClient", "=== CONNECTION OPENED ===");
+                Log.d("ChatApiClient", "Response Code: " + response.code());
+                Log.d("ChatApiClient", "Response Message: " + response.message());
+                Log.d("ChatApiClient", "Is Aliyun Mode: " + GlobalDataHolder.getUseAliyunChat());
+                Log.d("ChatApiClient", "========================");
             }
 
             @Override
@@ -346,15 +354,29 @@ public class ChatApiClient {
                         if(response.body() != null) {
                             try {
                                 String errorBody = response.body().string();
+                                Log.e("ChatApiClient", "=== ERROR RESPONSE DEBUG ===");
+                                Log.e("ChatApiClient", "HTTP Code: " + response.code());
+                                Log.e("ChatApiClient", "HTTP Message: " + response.message());
+                                Log.e("ChatApiClient", "Response Headers: " + response.headers().toString());
                                 Log.e("ChatApiClient", "Error Response Body: " + errorBody);
+                                Log.e("ChatApiClient", "Is Aliyun Mode: " + GlobalDataHolder.getUseAliyunChat());
+                                Log.e("ChatApiClient", "Request URL: " + url);
+                                Log.e("ChatApiClient", "============================");
                                 
                                 // 尝试解析阿里云API错误格式
-                                String err = parseAliyunError(errorBody, response.code());
+                                String err;
+                                if (GlobalDataHolder.getUseAliyunChat()) {
+                                    err = parseAliyunError(errorBody, response.code());
+                                } else {
+                                    err = "HTTP " + response.code() + ": " + response.message() + "\n" + errorBody;
+                                }
+                                
                                 if(err.length() > 500) {
                                     err = err.substring(0, 500) + "...";
                                 }
                                 listener.onError(err);
                             } catch (IOException e) {
+                                Log.e("ChatApiClient", "Failed to read error response body", e);
                                 listener.onError("HTTP " + response.code() + ": " + response.message());
                             }
                         } else {
@@ -370,15 +392,23 @@ public class ChatApiClient {
 
     // 配置API信息
     public void setApiInfo(String url, String apiKey) {
-        // 根据是否使用阿里云来决定API端点
+        // 根据是否使用阿里云来决定API端点和API Key
         String actualUrl = url;
         String actualApiKey = apiKey;
         
         if (GlobalDataHolder.getUseAliyunChat()) {
             // 根据阿里云官方文档，使用OpenAI兼容模式的base_url
             actualUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
-            // 阿里云聊天模型使用OpenAI API Key字段存储的阿里云API Key
-            actualApiKey = apiKey;
+            // 在阿里云模式下，优先使用阿里云ASR的API Key，如果没有则使用传入的API Key
+            String aliyunApiKey = GlobalDataHolder.getAsrAliyunApiKey();
+            if (aliyunApiKey != null && !aliyunApiKey.trim().isEmpty() && aliyunApiKey.startsWith("sk-")) {
+                actualApiKey = aliyunApiKey;
+                Log.d("ChatApiClient", "Using Aliyun ASR API Key for chat: " + (actualApiKey.length() > 10 ? actualApiKey.substring(0, 10) + "..." : actualApiKey));
+            } else {
+                // 如果阿里云ASR API Key不可用，则使用传入的API Key（应该也是阿里云格式）
+                actualApiKey = apiKey;
+                Log.d("ChatApiClient", "Using provided API Key for Aliyun chat: " + (actualApiKey != null && actualApiKey.length() > 10 ? actualApiKey.substring(0, 10) + "..." : "null"));
+            }
             Log.d("ChatApiClient", "Using Aliyun DashScope API: " + actualUrl);
         }
         
@@ -397,8 +427,25 @@ public class ChatApiClient {
             if (GlobalDataHolder.getUseAliyunChat()) {
                 // 阿里云API Key通常以sk-开头
                 if (!actualApiKey.startsWith("sk-")) {
-                    Log.w("ChatApiClient", "阿里云API Key格式可能不正确，应以'sk-'开头");
+                    Log.e("ChatApiClient", "阿里云API Key格式错误！当前API Key: " + (actualApiKey != null && actualApiKey.length() > 10 ? actualApiKey.substring(0, 10) + "..." : actualApiKey));
+                    Log.e("ChatApiClient", "阿里云API Key应该以'sk-'开头，例如: sk-xxxxxxxxxx");
+                    throw new IllegalArgumentException("阿里云API Key格式错误，应以'sk-'开头。请在设置中填入正确的阿里云API Key！");
                 }
+                
+                // 验证阿里云URL格式
+                if (!actualUrl.contains("aliyuncs.com")) {
+                    Log.e("ChatApiClient", "阿里云URL格式错误！当前URL: " + actualUrl);
+                    Log.e("ChatApiClient", "正确的URL应该是: https://dashscope.aliyuncs.com/compatible-mode/v1");
+                    throw new IllegalArgumentException("阿里云URL格式错误，正确格式应为: https://dashscope.aliyuncs.com/compatible-mode/v1");
+                }
+                
+                // 检查常见的拼写错误
+                if (actualUrl.contains("aiyuncs.com")) {
+                    Log.e("ChatApiClient", "检测到URL拼写错误：'aiyuncs.com' 应该是 'aliyuncs.com'");
+                    throw new IllegalArgumentException("URL拼写错误：应该是 'aliyuncs.com' 而不是 'aiyuncs.com'");
+                }
+                
+                Log.d("ChatApiClient", "阿里云配置验证通过 - URL: " + actualUrl + ", API Key格式正确");
             }
             
             Log.d("ChatApiClient", "Initializing OpenAI client with URL: " + actualUrl);
@@ -438,6 +485,73 @@ public class ChatApiClient {
 
     // 设置温度
     public void setTemperature(float temperature) { this.temperature = temperature; }
+    
+    // 测试阿里云连接
+    public void testAliyunConnection() {
+        if (!GlobalDataHolder.getUseAliyunChat()) {
+            Log.d("ChatApiClient", "Not in Aliyun mode, skipping connection test");
+            return;
+        }
+        
+        Log.d("ChatApiClient", "=== TESTING ALIYUN CONNECTION ===");
+        Log.d("ChatApiClient", "URL: " + url);
+        Log.d("ChatApiClient", "API Key: " + (apiKey != null && apiKey.length() > 10 ? apiKey.substring(0, 10) + "..." : apiKey));
+        Log.d("ChatApiClient", "Model: " + model);
+        
+        // 创建一个简单的测试消息
+        ArrayList<Message> testMessages = new ArrayList<>();
+        testMessages.add(Message.builder().role(Message.Role.USER).content("测试连接").build());
+        
+        ChatCompletion testCompletion = ChatCompletion.builder()
+                .messages(testMessages)
+                .model(model.replaceAll("\\*$",""))
+                .temperature(0.1f)
+                .maxTokens(10)
+                .build();
+        
+        Log.d("ChatApiClient", "Sending test request...");
+        
+        try {
+            chatGPT.streamChatCompletion(testCompletion, new EventSourceListener() {
+                @Override
+                public void onOpen(EventSource eventSource, Response response) {
+                    Log.d("ChatApiClient", "✅ Test connection successful! Response: " + response.code());
+                }
+                
+                @Override
+                public void onEvent(EventSource eventSource, String id, String type, String data) {
+                    Log.d("ChatApiClient", "✅ Test response received: " + data);
+                    eventSource.cancel(); // 取消测试请求
+                }
+                
+                @Override
+                public void onFailure(EventSource eventSource, Throwable t, Response response) {
+                    if (response != null) {
+                        Log.e("ChatApiClient", "❌ Test connection failed: HTTP " + response.code());
+                        try {
+                            if (response.body() != null) {
+                                String errorBody = response.body().string();
+                                Log.e("ChatApiClient", "❌ Test error response: " + errorBody);
+                            }
+                        } catch (Exception e) {
+                            Log.e("ChatApiClient", "❌ Failed to read test error response", e);
+                        }
+                    } else {
+                        Log.e("ChatApiClient", "❌ Test connection failed: " + (t != null ? t.getMessage() : "Unknown error"));
+                    }
+                }
+                
+                @Override
+                public void onClosed(EventSource eventSource) {
+                    Log.d("ChatApiClient", "Test connection closed");
+                }
+            });
+        } catch (Exception e) {
+            Log.e("ChatApiClient", "❌ Failed to start test connection", e);
+        }
+        
+        Log.d("ChatApiClient", "================================");
+    }
 
     // 添加一个函数，有同名函数则覆盖
     public void addFunction(String name, String desc, String params, String[] required) {
@@ -484,10 +598,12 @@ public class ChatApiClient {
     
     // 解析阿里云API错误响应
     private String parseAliyunError(String errorBody, int httpCode) {
+        Log.d("ChatApiClient", "Parsing Aliyun error response: " + errorBody);
+        
         try {
             JSONObject errorJson = new JSONObject(errorBody);
             
-            // 阿里云API错误格式通常包含error字段
+            // 阿里云API错误格式1: OpenAI兼容格式 {"error": {"message": "...", "type": "...", "code": "..."}}
             if (errorJson.containsKey("error")) {
                 JSONObject error = errorJson.getJSONObject("error");
                 String message = error.getStr("message", "");
@@ -495,6 +611,7 @@ public class ChatApiClient {
                 String type = error.getStr("type", "");
                 
                 StringBuilder errorMsg = new StringBuilder();
+                errorMsg.append("阿里云API错误\n");
                 if (!code.isEmpty()) {
                     errorMsg.append("错误代码: ").append(code).append("\n");
                 }
@@ -508,26 +625,45 @@ public class ChatApiClient {
                 }
                 
                 // 针对常见错误提供解决建议
-                if (code.equals("InvalidApiKey") || message.contains("API key")) {
-                    errorMsg.append("\n\n建议: 请检查阿里云API Key是否正确");
-                } else if (code.equals("InsufficientBalance") || message.contains("balance")) {
-                    errorMsg.append("\n\n建议: 账户余额不足，请充值");
-                } else if (code.equals("RateLimitExceeded") || message.contains("rate limit")) {
-                    errorMsg.append("\n\n建议: 请求频率过高，请稍后重试");
-                } else if (code.equals("ModelNotFound") || message.contains("model")) {
-                    errorMsg.append("\n\n建议: 请检查模型名称是否正确");
+                if (code.equals("invalid_api_key") || code.equals("InvalidApiKey") || message.contains("API key") || message.contains("api_key")) {
+                    errorMsg.append("\n\n💡 解决方案: 请检查阿里云API Key是否正确，确保以'sk-'开头");
+                } else if (code.equals("insufficient_quota") || code.equals("InsufficientBalance") || message.contains("balance") || message.contains("quota")) {
+                    errorMsg.append("\n\n💡 解决方案: 账户余额不足，请前往阿里云控制台充值");
+                } else if (code.equals("rate_limit_exceeded") || code.equals("RateLimitExceeded") || message.contains("rate limit")) {
+                    errorMsg.append("\n\n💡 解决方案: 请求频率过高，请稍后重试");
+                } else if (code.equals("model_not_found") || code.equals("ModelNotFound") || message.contains("model")) {
+                    errorMsg.append("\n\n💡 解决方案: 请检查模型名称是否正确，当前支持的模型: qwen-turbo, qwen-plus, qwen-max等");
+                } else if (message.contains("unauthorized") || message.contains("authentication")) {
+                    errorMsg.append("\n\n💡 解决方案: 认证失败，请检查API Key是否有效");
                 }
                 
                 return errorMsg.toString();
             }
             
-            // 如果没有标准的error字段，尝试其他可能的字段
+            // 阿里云API错误格式2: DashScope原生格式 {"code": "...", "message": "...", "request_id": "..."}
+            if (errorJson.containsKey("code") && errorJson.containsKey("message")) {
+                String code = errorJson.getStr("code", "");
+                String message = errorJson.getStr("message", "");
+                String requestId = errorJson.getStr("request_id", "");
+                
+                StringBuilder errorMsg = new StringBuilder();
+                errorMsg.append("阿里云DashScope错误\n");
+                errorMsg.append("错误代码: ").append(code).append("\n");
+                errorMsg.append("错误信息: ").append(message);
+                if (!requestId.isEmpty()) {
+                    errorMsg.append("\n请求ID: ").append(requestId);
+                }
+                
+                return errorMsg.toString();
+            }
+            
+            // 阿里云API错误格式3: 简单消息格式
             if (errorJson.containsKey("message")) {
-                return "错误: " + errorJson.getStr("message");
+                return "阿里云API错误: " + errorJson.getStr("message");
             }
             
             if (errorJson.containsKey("detail")) {
-                return "错误: " + errorJson.getStr("detail");
+                return "阿里云API错误: " + errorJson.getStr("detail");
             }
             
         } catch (Exception e) {
@@ -535,17 +671,26 @@ public class ChatApiClient {
         }
         
         // 如果无法解析JSON，返回原始错误信息和HTTP状态码
-        String fallbackMsg = "HTTP " + httpCode + " 错误";
-        if (httpCode == 401) {
-            fallbackMsg += "\n可能原因: API Key无效或已过期";
+        StringBuilder fallbackMsg = new StringBuilder();
+        fallbackMsg.append("HTTP ").append(httpCode).append(" 错误\n");
+        
+        if (httpCode == 400) {
+            fallbackMsg.append("💡 可能原因: 请求参数错误，请检查模型名称和API Key格式");
+        } else if (httpCode == 401) {
+            fallbackMsg.append("💡 可能原因: API Key无效或已过期，请检查阿里云API Key");
         } else if (httpCode == 403) {
-            fallbackMsg += "\n可能原因: 没有访问权限或余额不足";
+            fallbackMsg.append("💡 可能原因: 没有访问权限或余额不足，请检查账户状态");
+        } else if (httpCode == 404) {
+            fallbackMsg.append("💡 可能原因: 请求的模型或端点不存在，请检查URL和模型名称");
         } else if (httpCode == 429) {
-            fallbackMsg += "\n可能原因: 请求频率过高，请稍后重试";
+            fallbackMsg.append("💡 可能原因: 请求频率过高，请稍后重试");
         } else if (httpCode == 500) {
-            fallbackMsg += "\n可能原因: 服务器内部错误，请稍后重试";
+            fallbackMsg.append("💡 可能原因: 阿里云服务器内部错误，请稍后重试");
+        } else if (httpCode == 502 || httpCode == 503 || httpCode == 504) {
+            fallbackMsg.append("💡 可能原因: 阿里云服务暂时不可用，请稍后重试");
         }
         
-        return fallbackMsg + "\n\n原始响应: " + errorBody;
+        fallbackMsg.append("\n\n原始响应: ").append(errorBody);
+        return fallbackMsg.toString();
     }
 }

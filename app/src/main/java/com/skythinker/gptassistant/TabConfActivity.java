@@ -117,6 +117,11 @@ public class TabConfActivity extends Activity {
         ((Switch) findViewById(R.id.sw_use_aliyun_chat_conf)).setOnCheckedChangeListener((compoundButton, checked) -> {
             GlobalDataHolder.saveAliyunChatSetting(checked);
             updateModelList(); // 切换模型列表
+            
+            if (checked) {
+                // 开启阿里云模式时，自动填充配置
+                autoFillAliyunConfig();
+            }
         });
 
         ((EditText) findViewById(R.id.et_openai_host_conf)).setText(GlobalDataHolder.getGptApiHost());
@@ -145,7 +150,8 @@ public class TabConfActivity extends Activity {
         initializeModelList(); // 初始化模型列表
         ((Spinner) findViewById(R.id.sp_model_conf)).setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) { // 有选项被选中
-                GlobalDataHolder.saveGptApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey(), adapterView.getItemAtPosition(i).toString(), GlobalDataHolder.getCustomModels());
+                String selectedModel = adapterView.getItemAtPosition(i).toString();
+                GlobalDataHolder.saveGptApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey(), selectedModel, GlobalDataHolder.getCustomModels());
                 modelsAdapter.notifyDataSetChanged();
             }
             public void onNothingSelected(AdapterView<?> adapterView) { }
@@ -570,5 +576,56 @@ public class TabConfActivity extends Activity {
                     modelsAdapter.getItem(0), GlobalDataHolder.getCustomModels());
             }
         }
+    }
+    
+    // 自动填充阿里云配置
+    private void autoFillAliyunConfig() {
+        // 阿里云官方配置
+        String aliyunApiKey = "sk-cca081700e614b30a601d3599f94e5f4";
+        String aliyunBaseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+        String defaultModel = "qwen-turbo";
+        
+        // 检查当前API Key是否为空或不是阿里云格式
+        String currentApiKey = GlobalDataHolder.getGptApiKey();
+        if (currentApiKey == null || currentApiKey.trim().isEmpty() || !currentApiKey.startsWith("sk-")) {
+            // 自动填充API Key
+            ((EditText) findViewById(R.id.et_openai_key_conf)).setText(aliyunApiKey);
+            Log.d("TabConfActivity", "Auto-filled Aliyun API Key");
+        }
+        
+        // 检查当前URL是否为空或不是阿里云地址
+        String currentUrl = GlobalDataHolder.getGptApiHost();
+        if (currentUrl == null || currentUrl.trim().isEmpty() || !currentUrl.contains("dashscope.aliyuncs.com")) {
+            // 自动填充Base URL
+            ((EditText) findViewById(R.id.et_openai_host_conf)).setText(aliyunBaseUrl);
+            Log.d("TabConfActivity", "Auto-filled Aliyun Base URL");
+        }
+        
+        // 检查当前模型是否为阿里云模型
+        String currentModel = GlobalDataHolder.getGptModel();
+        boolean isQwenModel = false;
+        String[] qwenModels = getResources().getStringArray(R.array.qwen_models);
+        for (String qwenModel : qwenModels) {
+            if (qwenModel.equals(currentModel)) {
+                isQwenModel = true;
+                break;
+            }
+        }
+        
+        if (!isQwenModel) {
+            // 自动选择默认的Qwen模型
+            for (int i = 0; i < modelsAdapter.getCount(); i++) {
+                if (modelsAdapter.getItem(i).equals(defaultModel)) {
+                    ((Spinner) findViewById(R.id.sp_model_conf)).setSelection(i);
+                    Log.d("TabConfActivity", "Auto-selected default Qwen model: " + defaultModel);
+                    break;
+                }
+            }
+        }
+        
+        // 显示提示信息
+        GlobalUtils.showToast(this, "已自动配置阿里云通义千问服务\n" +
+                "Base URL: " + aliyunBaseUrl + "\n" +
+                "API Key: " + aliyunApiKey.substring(0, 10) + "...", false);
     }
 }

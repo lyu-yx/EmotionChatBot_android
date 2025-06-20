@@ -841,8 +841,12 @@ public class MainActivity extends Activity {
         spModels.setAdapter(modelsAdapter);
         spModels.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() { // 设置选项点击事件
             public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
-                GlobalDataHolder.saveGptApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey(), adapterView.getItemAtPosition(i).toString(), GlobalDataHolder.getCustomModels());
-                chatApiClient.setModel(currentTemplateParams.getStr("model", GlobalDataHolder.getGptModel()));
+                String selectedModel = adapterView.getItemAtPosition(i).toString();
+                GlobalDataHolder.saveGptApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey(), selectedModel, GlobalDataHolder.getCustomModels());
+                // 直接使用用户选择的模型，而不是模板参数中的模型
+                chatApiClient.setModel(selectedModel);
+                // 同时设置温度参数
+                chatApiClient.setTemperature(GlobalDataHolder.getGptTemperature());
                 modelsAdapter.notifyDataSetChanged();
             }
             public void onNothingSelected(AdapterView<?> adapterView) { }
@@ -985,7 +989,12 @@ public class MainActivity extends Activity {
         }
         currentTemplateParams = GlobalDataHolder.getTabDataList().get(selectedTab).parseParams();
         Log.d("MainActivity", "switch template: params=" + currentTemplateParams);
-        chatApiClient.setModel(currentTemplateParams.getStr("model", GlobalDataHolder.getGptModel()));
+        
+        // 使用模板中指定的模型，如果没有则使用全局设置的模型
+        String templateModel = currentTemplateParams.getStr("model", GlobalDataHolder.getGptModel());
+        chatApiClient.setModel(templateModel);
+        chatApiClient.setTemperature(GlobalDataHolder.getGptTemperature());
+        
         setNetworkEnabled(currentTemplateParams.getBool("network", GlobalDataHolder.getEnableInternetAccess()));
         updateTabListView();
         updateTemplateParamsView();
@@ -1715,6 +1724,13 @@ public class MainActivity extends Activity {
         
         // 更新ChatApiClient的配置
         chatApiClient.setApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey());
+        chatApiClient.setModel(GlobalDataHolder.getGptModel());
+        chatApiClient.setTemperature(GlobalDataHolder.getGptTemperature());
+        
+        // 如果启用了阿里云模式，进行连接测试
+        if (GlobalDataHolder.getUseAliyunChat()) {
+            chatApiClient.testAliyunConnection();
+        }
     }
 
     @Override
