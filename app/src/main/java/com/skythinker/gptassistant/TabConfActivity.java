@@ -52,6 +52,9 @@ public class TabConfActivity extends Activity {
     private TabConfListAdapter adapter;
     private BroadcastReceiver localReceiver;
     private Handler handler = new Handler();
+    
+    private List<String> models;
+    private ArrayAdapter<String> modelsAdapter;
 
     private interface CustomTextWatcher extends TextWatcher { // 去掉TextWatcher不需要的方法
         @Override default void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {}
@@ -110,6 +113,12 @@ public class TabConfActivity extends Activity {
             startEditTab("", "", tabDataList.size());
         });
 
+        ((Switch) findViewById(R.id.sw_use_aliyun_chat_conf)).setChecked(GlobalDataHolder.getUseAliyunChat());
+        ((Switch) findViewById(R.id.sw_use_aliyun_chat_conf)).setOnCheckedChangeListener((compoundButton, checked) -> {
+            GlobalDataHolder.saveAliyunChatSetting(checked);
+            updateModelList(); // 切换模型列表
+        });
+
         ((EditText) findViewById(R.id.et_openai_host_conf)).setText(GlobalDataHolder.getGptApiHost());
         ((EditText) findViewById(R.id.et_openai_host_conf)).addTextChangedListener(new CustomTextWatcher() {
             public void afterTextChanged(Editable editable) {
@@ -133,22 +142,7 @@ public class TabConfActivity extends Activity {
             }
         });
 
-        List<String> models = new ArrayList<>(Arrays.asList(getResources().getStringArray(R.array.models))); // 内置模型列表
-        models.addAll(GlobalDataHolder.getCustomModels()); // 自定义模型列表
-        ArrayAdapter<String> modelsAdapter = new ArrayAdapter<String>(this, R.layout.model_spinner_item, models) { // 设置Spinner样式和列表数据
-            @Override
-            public View getDropDownView(int position, @Nullable View convertView, @NonNull ViewGroup parent) { // 设置选中/未选中的选项样式
-                TextView tv = (TextView) super.getDropDownView(position, convertView, parent);
-                if(((Spinner) findViewById(R.id.sp_model_conf)).getSelectedItemPosition() == position) { // 选中项
-                    tv.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-                } else { // 未选中项
-                    tv.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
-                }
-                return tv;
-            }
-        };
-        modelsAdapter.setDropDownViewResource(R.layout.model_spinner_dropdown_item); // 设置下拉选项样式
-        ((Spinner) findViewById(R.id.sp_model_conf)).setAdapter(modelsAdapter);
+        initializeModelList(); // 初始化模型列表
         ((Spinner) findViewById(R.id.sp_model_conf)).setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) { // 有选项被选中
                 GlobalDataHolder.saveGptApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey(), adapterView.getItemAtPosition(i).toString(), GlobalDataHolder.getCustomModels());
@@ -156,15 +150,7 @@ public class TabConfActivity extends Activity {
             }
             public void onNothingSelected(AdapterView<?> adapterView) { }
         });
-        for(int i = 0; i < modelsAdapter.getCount(); i++) { // 根据当前模型名查找选中的选项
-            if(modelsAdapter.getItem(i).equals(GlobalDataHolder.getGptModel())) {
-                ((Spinner) findViewById(R.id.sp_model_conf)).setSelection(i);
-                break;
-            }
-            if(i == modelsAdapter.getCount() - 1) { // 没有找到当前模型名，默认选中第一项
-                ((Spinner) findViewById(R.id.sp_model_conf)).setSelection(0);
-            }
-        }
+
 
         ((EditText) findViewById(R.id.et_custom_model_conf)).setText(String.join(";", GlobalDataHolder.getCustomModels()));
         ((EditText) findViewById(R.id.et_custom_model_conf)).addTextChangedListener(new CustomTextWatcher() {
@@ -172,10 +158,7 @@ public class TabConfActivity extends Activity {
                 List<String> modelList = new ArrayList<>(Arrays.asList(editable.toString().trim().split(";")));
                 modelList.removeIf(String::isEmpty);
                 GlobalDataHolder.saveGptApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey(), GlobalDataHolder.getGptModel(), modelList);
-                models.clear();
-                models.addAll(Arrays.asList(getResources().getStringArray(R.array.models)));
-                models.addAll(modelList);
-                modelsAdapter.notifyDataSetChanged();
+                updateModelList();
             }
         });
 
@@ -524,5 +507,68 @@ public class TabConfActivity extends Activity {
     public void finish() {
         super.finish();
         overridePendingTransition(R.anim.translate_left_in, R.anim.translate_right_out);
+    }
+
+    private void initializeModelList() {
+        models = new ArrayList<>();
+        updateModelList();
+        
+        modelsAdapter = new ArrayAdapter<String>(this, R.layout.model_spinner_item, models) {
+            @Override
+            public View getDropDownView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
+                TextView tv = (TextView) super.getDropDownView(position, convertView, parent);
+                if(((Spinner) findViewById(R.id.sp_model_conf)).getSelectedItemPosition() == position) {
+                    tv.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                } else {
+                    tv.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
+                }
+                return tv;
+            }
+        };
+        modelsAdapter.setDropDownViewResource(R.layout.model_spinner_dropdown_item);
+        ((Spinner) findViewById(R.id.sp_model_conf)).setAdapter(modelsAdapter);
+        
+        // 设置当前选中的模型
+        for(int i = 0; i < modelsAdapter.getCount(); i++) {
+            if(modelsAdapter.getItem(i).equals(GlobalDataHolder.getGptModel())) {
+                ((Spinner) findViewById(R.id.sp_model_conf)).setSelection(i);
+                break;
+            }
+            if(i == modelsAdapter.getCount() - 1) {
+                ((Spinner) findViewById(R.id.sp_model_conf)).setSelection(0);
+            }
+        }
+    }
+
+    private void updateModelList() {
+        models.clear();
+        
+        // 根据是否使用阿里云来选择基础模型列表
+        if (GlobalDataHolder.getUseAliyunChat()) {
+            models.addAll(Arrays.asList(getResources().getStringArray(R.array.qwen_models)));
+        } else {
+            models.addAll(Arrays.asList(getResources().getStringArray(R.array.models)));
+        }
+        
+        // 添加自定义模型
+        models.addAll(GlobalDataHolder.getCustomModels());
+        
+        if (modelsAdapter != null) {
+            modelsAdapter.notifyDataSetChanged();
+            
+            // 重新设置选中项
+            for(int i = 0; i < modelsAdapter.getCount(); i++) {
+                if(modelsAdapter.getItem(i).equals(GlobalDataHolder.getGptModel())) {
+                    ((Spinner) findViewById(R.id.sp_model_conf)).setSelection(i);
+                    return;
+                }
+            }
+            // 如果当前模型不在新列表中，选择第一个
+            if (modelsAdapter.getCount() > 0) {
+                ((Spinner) findViewById(R.id.sp_model_conf)).setSelection(0);
+                GlobalDataHolder.saveGptApiInfo(GlobalDataHolder.getGptApiHost(), GlobalDataHolder.getGptApiKey(), 
+                    modelsAdapter.getItem(0), GlobalDataHolder.getCustomModels());
+            }
+        }
     }
 }

@@ -8,6 +8,21 @@
         <item>gpt-4o</item>
         <item>gpt-4o-mini</item>
     </string-array>
+    <string-array name="qwen_models">
+        <item>qwen-turbo</item>
+        <item>qwen-plus</item>
+        <item>qwen-max</item>
+        <item>qwen-max-longcontext</item>
+        <item>qwen-vl-plus</item>
+        <item>qwen-vl-max</item>
+        <item>qwen1.5-72b-chat</item>
+        <item>qwen1.5-14b-chat</item>
+        <item>qwen1.5-7b-chat</item>
+        <item>qwen2.5-72b-instruct</item>
+        <item>qwen2.5-32b-instruct</item>
+        <item>qwen2.5-14b-instruct</item>
+        <item>qwen2.5-7b-instruct</item>
+    </string-array>
     <!--  在线资源Url  -->
     <string name="homepage_url_github" translatable="false">https://github.com/Skythinker616/gpt-assistant-android</string>
     <string name="homepage_url_gitee" translatable="false">https://gitee.com/skythinker/gpt-assistant-android</string>
@@ -73,6 +88,7 @@
     <string name="text_aliyun_asr_failed_error">Please check Aliyun ASR service settings</string>
     <string name="text_aliyun_asr_unsupported">Aliyun ASR service is temporarily unavailable</string>
     <string name="conf_aliyun_api_key_item">Aliyun API Key</string>
+    <string name="conf_use_aliyun_chat_item">Use Aliyun Qwen Models</string>
     <string name="conf_network_title">Networking Settings</string>
     <string name="conf_enable_network_item">Enable Web Access</string>
     <string name="conf_enable_network_tip">Significantly increases token usage</string>

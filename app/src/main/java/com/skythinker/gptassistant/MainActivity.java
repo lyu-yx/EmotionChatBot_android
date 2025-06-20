@@ -816,7 +816,14 @@ public class MainActivity extends Activity {
     // 更新模型下拉选框
     private void updateModelSpinner() {
         Spinner spModels = findViewById(R.id.sp_main_model);
-        List<String> models = new ArrayList<>(Arrays.asList(getResources().getStringArray(R.array.models))); // 获取内置模型列表
+        List<String> models = new ArrayList<>();
+        
+        // 根据是否使用阿里云来选择基础模型列表
+        if (GlobalDataHolder.getUseAliyunChat()) {
+            models.addAll(Arrays.asList(getResources().getStringArray(R.array.qwen_models)));
+        } else {
+            models.addAll(Arrays.asList(getResources().getStringArray(R.array.models)));
+        }
         models.addAll(GlobalDataHolder.getCustomModels()); // 添加自定义模型到列表
         ArrayAdapter<String> modelsAdapter = new ArrayAdapter<String>(this, R.layout.main_model_spinner_item, models) { // 设置Spinner样式和列表数据
             @Override

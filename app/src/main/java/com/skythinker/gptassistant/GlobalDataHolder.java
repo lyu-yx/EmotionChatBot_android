@@ -26,6 +26,7 @@ public class GlobalDataHolder {
     private static String asrSecretKey;
     private static boolean asrUseRealTime;
     private static String asrAliyunApiKey;
+    private static boolean useAliyunChat;
     private static String gptApiHost;
     private static String gptApiKey;
     private static String gptModel;
@@ -153,6 +154,7 @@ public class GlobalDataHolder {
     }
 
     public static void loadGptApiInfo() {
+        useAliyunChat = sp.getBoolean("use_aliyun_chat", false);
         gptApiHost = sp.getString("gpt_api_host", "https://api.openai.com/");
         gptApiKey = sp.getString("gpt_api_key", "");
         gptModel = sp.getString("gpt_model", "gpt-3.5-turbo");
@@ -170,6 +172,13 @@ public class GlobalDataHolder {
         editor.putString("gpt_api_key", gptApiKey);
         editor.putString("gpt_model", gptModel);
         editor.putString("custom_models", String.join(";", customModels));
+        editor.apply();
+    }
+
+    public static void saveAliyunChatSetting(boolean useAliyun) {
+        useAliyunChat = useAliyun;
+        SharedPreferences.Editor editor = sp.edit();
+        editor.putBoolean("use_aliyun_chat", useAliyunChat);
         editor.apply();
     }
 
@@ -306,6 +315,8 @@ public class GlobalDataHolder {
     public static boolean getAsrUseRealTime() { return asrUseRealTime; }
 
     public static String getAsrAliyunApiKey() { return asrAliyunApiKey; }
+
+    public static boolean getUseAliyunChat() { return useAliyunChat; }
 
     public static String getGptApiHost() { return gptApiHost; }
 

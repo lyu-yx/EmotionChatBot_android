@@ -341,15 +341,24 @@ public class ChatApiClient {
 
     // 配置API信息
     public void setApiInfo(String url, String apiKey) {
-        if(this.url.equals(url) && this.apiKey.equals(apiKey)) {
+        // 根据是否使用阿里云来决定API端点
+        String actualUrl = url;
+        String actualApiKey = apiKey;
+        
+        if (GlobalDataHolder.getUseAliyunChat()) {
+            actualUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1/";
+            actualApiKey = GlobalDataHolder.getAsrAliyunApiKey(); // 使用阿里云的API Key
+        }
+        
+        if(this.url.equals(actualUrl) && this.apiKey.equals(actualApiKey)) {
             return;
         }
-        this.url = url;
-        this.apiKey = apiKey;
+        this.url = actualUrl;
+        this.apiKey = actualApiKey;
         try {
             chatGPT = new OpenAiStreamClient.Builder()
-                    .apiKey(Arrays.asList(apiKey))
-                    .apiHost(url)
+                    .apiKey(Arrays.asList(actualApiKey))
+                    .apiHost(actualUrl)
                     .okHttpClient(httpClient)
                     .build();
         } catch (Exception e) {
